@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Folder File Vault</title>
+    <style>
+        :root {
+            --primary: #00ff41;
+            --bg: #0d0208;
+            --card-bg: rgba(0, 0, 0, 0.3);
+        }
+        body {
+            font-family: 'Courier New', monospace;
+            background: var(--bg);
+            color: var(--primary);
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            border: 1px dashed var(--primary);
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            text-shadow: 0 0 10px var(--primary);
+        }
+        .files-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+        .file-card {
+            border: 1px solid var(--primary);
+            padding: 15px;
+            background: var(--card-bg);
+            transition: all 0.3s;
+        }
+        .file-card:hover {
+            box-shadow: 0 0 15px var(--primary);
+            transform: translateY(-5px);
+        }
+        .file-icon {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+        .btn {
+            background: transparent;
+            border: 1px solid var(--primary);
+            color: var(--primary);
+            padding: 10px;
+            width: 100%;
+            margin-top: 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn:hover {
+            background: rgba(0, 255, 65, 0.2);
+        }
+        .scanning {
+            text-align: center;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>FOLDER FILE VAULT</h1>
+        <div class="files-grid" id="filesContainer">
+            <div class="scanning">Scanning folder for files...</div>
+        </div>
+    </div>
+
+    <script>
+        // Supported file extensions with icons
+        const fileTypes = {
+            // Archives
+            'zip': '🗜️', 'rar': '📦', '7z': '🗃️', 'tar': '🗄️', 
+            'gz': '🗄️', 'bz2': '🗄️', 'iso': '💿',
+            
+            // Documents
+            'pdf': '📄', 'doc': '📝', 'docx': '📝', 'xls': '📊',
+            'xlsx': '📊', 'ppt': '📑', 'pptx': '📑', 'txt': '📜',
+            'rtf': '📋', 'csv': '📊', 'odt': '📝',
+            
+            // Code
+            'html': '🌐', 'htm': '🌐', 'js': '📜', 'json': '📜',
+            'css': '🎨', 'php': '🐘', 'py': '🐍', 'java': '☕',
+            'c': '🔧', 'cpp': '🔧', 'cs': '🔷', 'sh': '💻',
+            'bat': '💻', 'ps1': '💻', 'md': '📝',
+            
+            // Media
+            'jpg': '🖼️', 'jpeg': '🖼️', 'png': '🖼️', 'gif': '🖼️',
+            'svg': '🖼️', 'mp3': '🎵', 'wav': '🎵', 'mp4': '🎬',
+            'avi': '🎬', 'mov': '🎬', 'webm': '🎬',
+            
+            // Executables
+            'exe': '⚙️', 'msi': '⚙️', 'dmg': '🍏', 'pkg': '🍏',
+            'deb': '🐧', 'rpm': '🐧', 'apk': '📱'
+        };
+
+        // Configuration
+        const config = {
+            scanInterval: 3000, // Check every 3 seconds
+            knownFiles: new Set() // Tracks existing files
+        };
+
+        // Initialize
+        function init() {
+            scanFolder();
+            setInterval(scanFolder, config.scanInterval);
+        }
+
+        // Scan folder for files
+        async function scanFolder() {
+            try {
+                // Get files from server (this would be your API endpoint)
+                const response = await fetch('/api/files');
+                if (!response.ok) throw new Error('Failed to fetch files');
+                
+                const files = await response.json();
+                
+                // Clear loading message
+                const container = document.getElementById('filesContainer');
+                const scanningMsg = container.querySelector('.scanning');
+                if (scanningMsg) scanningMsg.remove();
+                
+                // Process found files
+                files.forEach(file => {
+                    if (!config.knownFiles.has(file.name)) {
+                        addFileCard(file);
+                        config.knownFiles.add(file.name);
+                    }
+                });
+                
+                // Remove cards for deleted files
+                const currentCards = Array.from(container.querySelectorAll('.file-card'));
+                currentCards.forEach(card => {
+                    const filename = card.dataset.filename;
+                    if (!files.some(f => f.name === filename)) {
+                        removeFileCard(filename);
+                        config.knownFiles.delete(filename);
+                    }
+                });
+                
+            } catch (error) {
+                console.error("Scan error:", error);
+                document.getElementById('filesContainer').innerHTML = 
+                    `<div class="scanning">Error scanning folder: ${error.message}</div>`;
+            }
+        }
+
+        // Add file card to UI
+        function addFileCard(file) {
+            const container = document.getElementById('filesContainer');
+            const ext = file.name.split('.').pop().toLowerCase();
+            const icon = fileTypes[ext] || '📁';
+            
+            const card = document.createElement('div');
+            card.className = 'file-card';
+            card.dataset.filename = file.name;
+            
+            card.innerHTML = `
+                <div class="file-icon">${icon}</div>
+                <div class="file-name">${file.name}</div>
+                <div class="file-size">${file.size}</div>
+                <button class="btn" data-filename="${file.name}">
+                    DOWNLOAD
+                </button>
+            `;
+            
+            container.appendChild(card);
+        }
+
+        // Remove file card from UI
+        function removeFileCard(filename) {
+            const card = document.querySelector(`.file-card[data-filename="${filename}"]`);
+            if (card) {
+                card.style.opacity = '0';
+                card.style.transform = 'scale(0.9)';
+                setTimeout(() => card.remove(), 300);
+            }
+        }
+
+        // Handle file download
+        function downloadFile(filename) {
+            // In a real app, this would point to your file download endpoint
+            window.location.href = `/download?file=${encodeURIComponent(filename)}`;
+        }
+
+        // Event listeners
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('btn')) {
+                const filename = e.target.dataset.filename;
+                downloadFile(filename);
+            }
+        });
+
+        // Start the system
+        init();
+    </script>
+</body>
+</html>
